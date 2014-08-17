@@ -1,3 +1,134 @@
+int signExtend(int64_t x)
+{
+	int mask = 0x1;
+	int tmpval = 0;
+	int sign = x & (mask<<25);
+	REP(i,0,24)
+		tmpval += x&(mask << i);
+	if(sign)
+	{
+		tmpval -= sign;
+	}
+
+	return tmpval;
+		
+}
+void BBRL(int sw,int RN)
+{
+	//unconditional register branch
+	assert(RN>= 0 && RN <= 31);
+	uint64_t target = R[RN].getData();
+	NIO = R[RN].getData() - PC.getData();
+	if(sw == 0)
+	{
+		printf(" [log]-unconditional branch(register)\n");
+
+		PC.setData(target);
+	}
+	else
+	{
+ 		printf("[log]-unconditional call(register)\n");
+		//first save the address of next instruction
+		R[30].setData(PC.getData());
+		subroutine++;
+		PC.setData(target);
+	}
+
+}
+
+
+
+void BBL(int sw,uint64_t offset)
+{
+
+	NIO = offset - PC.getData();		
+	//unconditional immediate branch
+	if(sw == 0)
+	{
+		printf(" [log]-unconditional branch(immediate)\n");
+		PC.setData(offset);
+	}
+	else
+	{
+		printf("[log]-unconditional call(immediate)\n");
+		subroutine++;
+		R[30].setData(PC.getData());
+		PC.setData(offset); 
+	}
+}
+
+void BCOND(uint64_t offset,int condition)
+{
+
+	int cond = (condition&0x0000000e)>>1;
+	bool result;
+	switch(cond)
+	{
+		case 0:
+			result = ZFLAG;
+			break;
+		case 1:
+			result = CFLAG;
+			break;
+		case 2:
+			result = NFLAG;
+			break;
+		case 3:
+			result = OFLAG;
+			break;
+		case 4:
+			result = CFLAG && !ZFLAG;
+			break;
+		case 5:
+			result = NFLAG == OFLAG;
+			break;
+		case 6:
+			result = (NFLAG== OFLAG)&& !ZFLAG ;
+			break;
+		case 7:
+			result = true;
+			break;
+
+
+	}
+
+	if((condition &0x01) && condition != 15)
+		result = !result;
+
+	if(result)
+		BBL(0,offset);
+
+}
+
+void CBZNZ(int sw,int RT,uint64_t offset)
+{
+	uint64_t dat = R[RT].getData();
+	if(sw == 0)
+	{
+		printf("[log]- CBZ instruction ");
+		if(dat == 0)
+			BBL(0,offset);
+	}
+	else if(sw ==1)
+	{
+		printf("[log]- CBZ instruction ");
+		if(dat != 0)
+			BBL(0,offset);
+	}
+}
+void RET(int n = 30)
+{
+	if(skip )
+	{
+		skip = false;
+		return;
+	}
+	printf("[log] - RET instruction\n");
+	assert(n>= 0 && n <= 31);
+	NIO = R[n].getData() - PC.getData();
+	subroutine--;
+	PC.setData(R[n].getData());
+}
 void ADD(int sf, int sw,int RD,int RN,int immRM)
 {
 	

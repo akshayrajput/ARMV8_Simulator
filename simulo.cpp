@@ -1,7 +1,8 @@
 #include"simulo.h"
-#include"mem.h"
-#include"loader.h"
+#include"mem.cpp"
+#include"loader.cpp"
 #include"instructions.cpp"
+
 void initMem(uint64_t start)
 {
 	REP(i,0,4095)
@@ -11,6 +12,7 @@ void initMem(uint64_t start)
 		Memory[i].addr = start;
 		start+= 1 ;//each location is of size 64 bits - 8 bytes
 		breakpt[i] = false;
+		SR[i] = false;
 	}
 
 	REP(i,0,31)
@@ -18,6 +20,9 @@ void initMem(uint64_t start)
 		R[i].setData(0);
 
 	}
+	NIO = 4;
+	ZFLAG =NFLAG= OFLAG = CFLAG = false;
+	subroutine = 0;
 }
 
 int addrToIndex(char* addr)
@@ -180,8 +185,17 @@ void show_prompt()
 
 void fetch()
 {
+
+		
 	uint64_t addr = PC.getData();
 	int i = addr - Memory[0].addr; 
+	if(SR[i]>1 && subroutine == 0)//don't mess with main flow of control
+	{	
+			skip = true;
+	}
+	else if(SR[i] == 1)
+		SR[i]++;
+
 	printf("[log]-fetching instruction\n");
 	if(debug_prompt)
 	{
@@ -212,12 +226,21 @@ void fetch()
 
 void decode()
 {
+
+	
+
+    NIO = 4;
     int sf = (IR.getLowerData() & SF_MASK)>>31;
-    int type_inst = (IR.getLowerData() & TYPE_MASK) >>27;//instruction group
+    int type_inst = (IR.getLowerData() & TYPE_MASK) >>25;//instruction group
     int sw = 0;
     
-    if(type_inst == 2)  //operand data processing immediate
+    if(type_inst == 8 || type_inst == 9)  //operand data processing immediate
     {
+	    if(skip)
+	{ 
+	   printf("[log]- Skipping instruction\n"); 
+	   return;
+	}
 	sw = 0;
 	
         int inst = (IR.getData() & INST_IMM_TYPE) >> 23;
@@ -234,7 +257,7 @@ void decode()
 		int op3 = (IR.getLowerData() & 0x003ffc00)>>10;//imm10
 		if(opc == 0)
 		{
-			// TODO - add
+			
 			ADD(sf,sw,op1,op2,op3);
 		}
 		else if(opc == 1)
@@ -243,7 +266,7 @@ void decode()
 		}
 		else if(opc == 2)
 		{
-			//TODO - sub
+			
 			SUB(sf,sw,op1,op2,op3);
 			
 		}
@@ -315,9 +338,14 @@ void decode()
         
     }
     
-    else if (type_inst == 1 || type_inst == 3)  //operand data processing register
-    {
-	 sw = 1;
+    else if (type_inst == 5 || type_inst == 13)  //operand data processing register
+    { 
+	    if(skip)
+	{ 
+	   printf("[log]- Skipping instruction\n"); 
+	   return;
+	}
+	sw  = 1;
         int inst = (IR.getLowerData() & INST_REG_TYPE)>>21;
 
         if(inst >= 80 && inst <=87)
@@ -398,8 +426,90 @@ void decode()
         
           
     }
-    
-   
+
+    else if (type_inst == 10 || type_inst == 11) // branch instructions 
+  {
+
+	 int inst = (IR.getLowerData() & INST_B_TYPE)>>25;
+
+	 if(inst  == 10 || inst == 11)//unconditional branch
+	 {
+		if(skip)
+		{ 
+		   printf("[log]- Skipping instruction\n"); 
+		   return;
+		}
+		 int op  = sf;//opcode for unconditional types
+		 int64_t imm = IR.getLowerData()&0x03ffffff;
+		 imm = signExtend(imm);
+		 uint64_t offset = ((imm-1)*4) + PC.getData();
+		 NIO = offset - PC.getData();
+		 BBL(op,offset);
+	 }
+	 else if(inst == 42)
+	 {
+		 //conditional branch
+		if(skip)
+		{	 
+	 	  printf("[log]- Skipping instruction\n"); 
+	 	  return;
+		}	
+		int64_t imm = (IR.getLowerData()&0x00ffffe0)>>5;
+		imm = signExtend(imm);
+		int cond = IR.getLowerData()&0x0000000f;
+			
+		uint64_t offset = ((imm-1)*4)+PC.getData();
+		NIO = offset - PC.getData();
+		BCOND(offset,cond);	
+
+	 }
+	 else if(inst == 43)
+	 {
+		 //unconditional branch register
+		 int op = (IR.getLowerData() & 0x00600000)>>21;
+		 int RN = (IR.getLowerData() & 0x000003e0)>>5;
+		 if(op == 1 || op == 0)
+		{
+			//unconditional call register
+		if(skip)
+			{	 
+	 		  printf("[log]- Skipping instruction\n"); 
+	 		  return;
+			}	
+
+			BBRL(op,RN);
+
+		}
+		else if(op ==2)
+		{
+		
+			//unconditional ret
+			RN = 30;
+			RET(RN);
+
+		}
+	 }
+	 else if(inst == 26)
+	 {
+		if(skip)
+			{	 
+	 		  printf("[log]- Skipping instruction\n"); 
+	 		  return;
+			}
+				
+		//compare and branch immediate
+		int op  = (IR.getLowerData() & 0x01000000)>>24;//opcode
+		 int64_t imm = (IR.getLowerData()&0x00ffffe0)>>5;
+		 imm = signExtend(imm);
+		 int RT = IR.getLowerData()&0x0000001f ;
+		 uint64_t offset = ((imm-1)*4)+PC.getData();
+		 assert(RT >=0 && RT <= 31);
+		 NIO = offset - PC.getData();
+		 BBL(op,offset);
+
+	 }
+
+  }
 }
 
 int main(int argc, char* argv[])
@@ -413,11 +523,21 @@ int main(int argc, char* argv[])
 		if(strcmp(argv[1],"debug") == 0)
 	 		debug_prompt = true;
 	FILE* info = fopen("info.txt","r");
+	FILE* data = fopen("data.txt","r");
 	fscanf(info,"%lx %c",&start_addr,&endian);
 	fclose(info);
 
+	int ind;
 	initMem(start_addr);
-	printf("[log]- Memory initialised ");
+
+	while(fscanf(data, "%d",&ind)>0)
+	{
+		if(ind >= 0 && ind<=4095)
+			SR[ind]++ ;	
+	}
+	fclose(data);
+
+	printf("[log]- Memory initialised\n");
 	Loader loader("inst.txt");
 	
 	int x = loader.loadmem(start_ind,Memory,endian);
@@ -426,12 +546,12 @@ int main(int argc, char* argv[])
 	PC.setData(Memory[start_ind].addr);
 
 	int i = start_ind;
-	while(i < x)
+	while(i <= x-4)
 	{
 		
 		fetch();
 		decode();
-		i += 4;
+		i += NIO;
 	}
 
 	printf("[log]-Execution completed!\n");			

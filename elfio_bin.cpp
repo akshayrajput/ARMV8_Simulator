@@ -56,19 +56,39 @@ int main(int argc, char** argv )
 	Elf_Half sec_num = reader.sections.size();
 	REP(i,0,sec_num-1)
 	{
- 		const section* psec = reader.sections[i];
+ 		section* psec = reader.sections[i];
 		const char* p = psec->get_data();
+		if ( psec->get_type() == SHT_SYMTAB ) 
+		{
+			const symbol_section_accessor symbols( reader, psec );
+			for ( unsigned int j = 0; j < symbols.get_symbols_num(); ++j ) {
+				std::string
+				 name;
+				 Elf64_Addr
+				  value;
+				  Elf_Xword
+				   size;
+				   unsigned char bind;
+				   unsigned char type;
+				   Elf_Half
+				    section_index;
+				    unsigned char other;
+			symbols.get_symbol( j, name, value, size, bind,type, section_index, other );
+			if(name != "" && name!= "$x")
+				fprintf(data_file,"%lu\n",value);	
+			}
+		}
 
 		if( p != NULL && psec->get_name() == ".text")
 		{
 			int l=0;
 		 	while(l < psec->get_size()) { fprintf(inst_file,"%.2x",(unsigned)(unsigned char)p[l]);  l++;} //note- cout<<hex could also be used 
 		} 
-		else if( p != NULL && psec->get_name() == ".data")
+	/*	else if( p != NULL && psec->get_name() == ".data")
 		{
 			int l=0;
 		 	while(l < psec->get_size()) { fprintf(data_file,"%.2x",(unsigned)(unsigned char)p[l]);  l++;} //note- cout<<hex could also be used 
-		}
+		}*/
 	}
 
 	fclose(data_file);
