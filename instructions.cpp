@@ -1,10 +1,10 @@
-int signExtend(int64_t x)
+uint64_t signExtend(int64_t x,int n)
 {
 	int mask = 0x1;
-	int tmpval = 0;
-	int sign = x & (mask<<25);
-	REP(i,0,24)
-		tmpval += x&(mask << i);
+	uint64_t tmpval = 0;
+	int sign = x & (mask<<n);
+	REP(i,0,n-1)
+		tmpval += x & (mask << i);
 	if(sign)
 	{
 		tmpval -= sign;
@@ -13,6 +13,13 @@ int signExtend(int64_t x)
 	return tmpval;
 		
 }
+
+void NOP()
+{
+	printf("[log]- NOP instruction\n");
+	return;
+}
+
 void BBRL(int sw,int RN)
 {
 	//unconditional register branch
@@ -100,9 +107,14 @@ void BCOND(uint64_t offset,int condition)
 
 }
 
-void CBZNZ(int sw,int RT,uint64_t offset)
+void CBZNZ(int sf,int sw,int RT,uint64_t offset)
 {
-	uint64_t dat = R[RT].getData();
+	uint64_t dat;
+	if(sf==1)
+		dat = R[RT].getData();
+	else if (sf == 0)
+		dat = R[RT].getLowerData();
+
 	if(sw == 0)
 	{
 		printf("[log]- CBZ instruction ");
@@ -111,11 +123,12 @@ void CBZNZ(int sw,int RT,uint64_t offset)
 	}
 	else if(sw ==1)
 	{
-		printf("[log]- CBZ instruction ");
+		printf("[log]- CBNZ instruction ");
 		if(dat != 0)
 			BBL(0,offset);
 	}
 }
+
 void RET(int n = 30)
 {
 	if(skip )
@@ -208,16 +221,8 @@ void ASR(int sf, int sw, int op1, int op2, int  op3 )
 	   printf("[log] - ASR 64 bit immediate\n");
             uint64_t op2_data = R[op2].getData();
             uint64_t dat;
-            if(op2_data < 0)
-            {
-                dat = op2_data >> op3 | ~(0xffffffffffffffff >> op3);
-                R[op1].setData(dat);
-            }
-            else
-            {
-                dat = op2_data >> op3;
-                R[op1].setData(dat);
-            }
+            dat = op2_data >> op3;
+            R[op1].setData(dat);
             
         }
         
@@ -226,16 +231,9 @@ void ASR(int sf, int sw, int op1, int op2, int  op3 )
             uint64_t op2_data = R[op2].getData();
             uint64_t op3_data = R[op3].getData();
             uint64_t dat;
-            if(op2_data < 0)
-            {
-                dat = op2_data >> op3_data | ~(0xffffffffffffffff >> op3_data);
-                R[op1].setData(dat);
-            }
-            else
-            {
-                dat = op2_data >> op3_data;
-                R[op1].setData(dat);
-            }
+            dat = op2_data >> op3_data;
+            R[op1].setData(dat);
+            
         }
     }
     
@@ -246,16 +244,8 @@ void ASR(int sf, int sw, int op1, int op2, int  op3 )
 	    printf("[log] - ASR instruction - 32 bit \n");
             int op2_data = R[op2].getLowerData();
             int dat;
-            if(op2_data < 0)
-            {
-                dat = op2_data >> op3 | ~(0xffffffff >> op3);
-                R[op1].setLowerData(dat);
-            }
-            else
-            {
-                dat = op2_data >> op3;
-                R[op1].setLowerData(dat);
-            }
+            dat = op2_data >> op3;
+            R[op1].setLowerData(dat);
         }
         
         else    //register
@@ -263,16 +253,8 @@ void ASR(int sf, int sw, int op1, int op2, int  op3 )
             int op2_data = R[op2].getLowerData();
             int op3_data = R[op3].getLowerData();
             int dat;
-            if(op2_data < 0)
-            {
-                dat = op2_data >> op3_data | ~(0xffffffff >> op3_data);
-                R[op1].setLowerData(dat);
-            }
-            else
-            {
-                dat = op2_data >> op3_data;
-                R[op1].setLowerData(dat);
-            }
+            dat = op2_data >> op3_data;
+            R[op1].setLowerData(dat);
         }
     }
 }

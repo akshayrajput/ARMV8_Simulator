@@ -18,6 +18,7 @@ reg R[32]; // the register file
 mem Memory[4096]; // the memory
 reg IR; //the INSTRUCTION REGISTER
 reg PC;//the PROGRAM COUNTER 
+reg BR;//the BASE REGISTER - keeping the base address
 int NIO;//the next instruction offset
 bool debug_prompt;
 bool skip;

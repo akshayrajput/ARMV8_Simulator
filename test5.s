@@ -1,6 +1,7 @@
-mov w1,#2
-mov w3,#3
-bl _subr
-add w2,w1,w3
-_subr:add w3,w1,#3
-ret
+mov 
+_label:add x4,x2,x3
+adr x2,_label
+add w3,w1,#2
+add w5,w2,w1
+nop
+

@@ -8,7 +8,7 @@ RUN
 ----------------
 
 ARM binary should be in the same folder of the folder of simulo.
-Run  run.sh with the binary.
+Run  run.sh <binary-file>
 We can run in two mode
 1. simulo
 To run the simulator write in terminal './simulo' it will run the loaded binary.
@@ -22,16 +22,36 @@ debug mode supports the following command.
 3. break or b:to set breakpoint of memory address
 4. quit or q: it exits the program.
 5. run or r: it run the program until next breakpoint hit or the program exits.
+6. help or h :it shows the help menu
+7. del : delete breakpoint
 
-TODO
--------
-
-1.Debug - Giving watchpoints
-
-2.Simulator - Debugging LSL & ASR working ,Adding more instructions, Adding shell script for generic input names
+INSTRUCTIONS IMPLEMENTED
+-------------------------------
+MOV
+ADD
+ADDS
+SUB
+SUBS
+ADR
+ADRP
+B
+BL
+B.{cond}
+LDR
+LDP
+STR
+STP
+NOP
+CBZ
+CBNZ
+CMP
+ASR
+LSL
+LSR
+AND
+RET
 
 CREDITS
 ---------
-Akshay Rajput(2014MCS2115)
-Amartya Chaudhuri(2014MCS2117)
+Akshay Rajput
 

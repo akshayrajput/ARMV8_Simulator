@@ -1,7 +1,13 @@
 #include"simulo.h"
-#include"mem.cpp"
-#include"loader.cpp"
+#include"mem.h"
+#include"loader.h"
 #include"instructions.cpp"
+#include"CMP.cpp"
+#include"ADDS.cpp"
+#include"SUBS.cpp"
+#include"LDP.cpp"
+#include"ADR_ADRP.cpp"
+#include"LDR.cpp"
 
 void initMem(uint64_t start)
 {
@@ -63,6 +69,12 @@ void printRegMem(char* arg)
 		
 	if(c == 'x' || c == 'd')
 	{
+		if(*arg != 'r' && *arg != 'R')
+		{
+			printf("Please enter a valid command\n");
+			printf("Type help or h for details\n");
+			return;
+		}	
 		assert(*arg == 'R' || *arg == 'r');
 		arg++;
 		while(*arg == ' ') arg++ ;
@@ -73,7 +85,7 @@ void printRegMem(char* arg)
 		if(c == 'x')
 			printf("0x%02lx\n",R[regno].getData());
 		else if(c == 'd')
-			printf("%ld\n",R[regno].getData());
+			printf("%ld\n",(int64_t)R[regno].getData());
 	}
 	//TODO- else print memory
 	else
@@ -87,7 +99,15 @@ void printRegMem(char* arg)
 		 }
 
 		while(*arg == ' ')arg++;
-		 assert(*arg == 'w' || *arg == 'b' || *arg == 'd' );
+		
+		if(*arg != 'w' && *arg != 'b' && *arg!= 'd')
+		{
+			printf("Please enter a valid command\n");
+			printf("Type help or h for details\n");
+			return;
+		}
+		
+		assert(*arg == 'w' || *arg == 'b' || *arg == 'd' );
 		
 		int offset;
 		if(*arg == 'w')
@@ -100,6 +120,12 @@ void printRegMem(char* arg)
 		arg++;
 		while(*arg == ' ') arg++;
 
+		if(*arg != 'x' && *arg != 'd')
+		{
+			printf("Please enter a valid command\n");
+			printf("Type help or h for details\n");
+			return;
+		}
 		assert(*arg == 'x' || *arg == 'd');
 		c = *arg;
 
@@ -129,6 +155,17 @@ void delBreak(char* arg)
 	breakpt[ind] = false;
 }
 
+void printHelp()
+{
+	printf("Check register :- print/p x/d r(0-31)\n");
+	printf("Check memory :- print/p x/d <absolute addr hex>\n");
+	printf("Set breakpoint :-break/b <absolute addr hex>\n");
+	printf("Delete breakpoint :-del <absolute addr hex>\n");
+	printf("Execute next instruction:- next/n\n");
+	printf("Exit debugger and continue program execution:- run/r\n");
+	printf("Quit simulo:- quit/q");
+	printf("Print this help:- help/h\n");
+}
 void show_prompt()
 {
 	
@@ -176,8 +213,15 @@ void show_prompt()
 		{
 			return;
 		}
+		else if(strcmp(comm,"h")==0 || strcmp(comm,"help")==0 )
+		{
+			printHelp();
+		}
 		else
+		{
 			printf("Please enter a valid command\n");
+			printf("Type h or help for details");
+		}
 	}
 
 }
@@ -218,7 +262,7 @@ void fetch()
 	//TODO - take data to IR
 
 	IR.setData(w|x|y|z);
-
+	BR.setData(PC.getData());
 	PC.setData(addr + 4 );
 	printf("[log]-done fetching instruction\n");
 
@@ -226,8 +270,6 @@ void fetch()
 
 void decode()
 {
-
-	
 
     NIO = 4;
     int sf = (IR.getLowerData() & SF_MASK)>>31;
@@ -247,7 +289,18 @@ void decode()
 
         if(inst == 0 || inst == 1) // PC relative addressing
         {
+		//ADR , ADRP
             printf("[log] - PC relative\n");
+	    if(sf == 1)
+	    {
+		    printf("[log]- ADRP\n");
+		    ADR();
+	    }
+	    else
+	    {
+		    printf("[log] - ADR\n");
+		    ADR();
+	    }
         }
         else if(inst == 2 || inst == 3) // Add or subtract
         {
@@ -263,6 +316,7 @@ void decode()
 		else if(opc == 1)
 		{
 			//TODO - adds
+			ADDS();
 		}
 		else if(opc == 2)
 		{
@@ -273,6 +327,7 @@ void decode()
 		else if(opc == 3)
 		{
 			//TODO - subs
+			ADDS();
 		}
         }
         
@@ -391,6 +446,7 @@ void decode()
 		else if(opc == 1)
 		{
 			//TODO - adds
+			ADDS();
 		}
 		else if(opc == 2)
 		{
@@ -400,6 +456,7 @@ void decode()
 		else if(opc == 3)
 		{
 			//TODO - subs
+			ADDS();
 		}
 
         }
@@ -441,7 +498,7 @@ void decode()
 		}
 		 int op  = sf;//opcode for unconditional types
 		 int64_t imm = IR.getLowerData()&0x03ffffff;
-		 imm = signExtend(imm);
+		 imm = signExtend(imm,25);
 		 uint64_t offset = ((imm-1)*4) + PC.getData();
 		 NIO = offset - PC.getData();
 		 BBL(op,offset);
@@ -454,11 +511,18 @@ void decode()
 	 	  printf("[log]- Skipping instruction\n"); 
 	 	  return;
 		}	
+
+		if(sf ==1)
+		{
+			NOP();
+			return;
+		}
+
 		int64_t imm = (IR.getLowerData()&0x00ffffe0)>>5;
-		imm = signExtend(imm);
+		imm = signExtend(imm,25);
 		int cond = IR.getLowerData()&0x0000000f;
 			
-		uint64_t offset = ((imm-1)*4)+PC.getData();
+		uint64_t offset = ((imm-1)*4)+PC.getData();//FIXME - take BR.getData() and imm*4 instead
 		NIO = offset - PC.getData();
 		BCOND(offset,cond);	
 
@@ -500,14 +564,40 @@ void decode()
 		//compare and branch immediate
 		int op  = (IR.getLowerData() & 0x01000000)>>24;//opcode
 		 int64_t imm = (IR.getLowerData()&0x00ffffe0)>>5;
-		 imm = signExtend(imm);
+		 imm = signExtend(imm,25);
 		 int RT = IR.getLowerData()&0x0000001f ;
-		 uint64_t offset = ((imm-1)*4)+PC.getData();
+		 uint64_t offset = ((imm-1)*4)+PC.getData();//FIXME - use imm and BR.getData()
 		 assert(RT >=0 && RT <= 31);
+
 		 NIO = offset - PC.getData();
-		 BBL(op,offset);
+		 CBZNZ(sf,op,RT,offset);
 
 	 }
+
+  }
+  else //load / store
+  {
+	int inst = (IR.getLowerData() & 0x10000000)>>28;
+
+	  if(skip)
+		{	 
+	 		  printf("[log]- Skipping instruction\n"); 
+	 		  return;
+		}	
+	
+	if(inst == 0)
+	{
+		//TODO - STP,LDP 
+		printf("[log] - LDP/STP instruction\n");
+		LDP();
+	}
+
+	else if(inst == 1)
+	{
+	//TODO - LDR,LDRSW,STR
+	printf("[log] - LDR/STR instruction\n");
+	LDR();
+	}
 
   }
 }
